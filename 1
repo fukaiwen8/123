@@ -1,1 +1,67 @@
+import sys
+
+# Mapper
+def mapper():
+    """
+    读取每行边数据，将节点及其出现位置（左 or 右）分别输出。
+    输出格式: node \t position(Left/Right) \t count(1)
+    """
+    for line in sys.stdin:
+        line = line.strip()
+        nodes = line.split()
+        if len(nodes) == 2:
+            left_node, right_node = nodes
+            # 左节点输出
+            print(f"{left_node}\tLeft\t1")
+            # 右节点输出
+            print(f"{right_node}\tRight\t1")
+
+# Combiner 和 Reducer
+def reducer():
+    """
+    对每个节点在左边和右边的出现次数进行汇总。
+    过滤掉总出现次数小于3的节点。
+    输出格式: node \t [left_count, right_count]
+    """
+    current_node = None
+    left_count, right_count = 0, 0  # 初始化左边和右边的计数
+
+    for line in sys.stdin:
+        line = line.strip()
+        node, position, count = line.split("\t")
+        count = int(count)
+
+        # 汇总当前节点的计数
+        if current_node == node:
+            if position == "Left":
+                left_count += count
+            elif position == "Right":
+                right_count += count
+        else:
+            # 输出上一个节点的统计结果
+            if current_node and (left_count + right_count) >= 3:
+                print(f"{current_node}\t[{left_count}, {right_count}]")
+            # 更新当前节点
+            current_node = node
+            left_count, right_count = 0, 0
+            if position == "Left":
+                left_count = count
+            elif position == "Right":
+                right_count = count
+
+    # 输出最后一个节点的结果
+    if current_node and (left_count + right_count) >= 3:
+        print(f"{current_node}\t[{left_count}, {right_count}]")
+
+# 主函数
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "mapper":
+            mapper()
+        elif sys.argv[1] == "reducer":
+            reducer()
+        else:
+            print("Usage: python mr_final.py [mapper|reducer]")
+    else:
+        print("Usage: python mr_final.py [mapper|reducer]")
 
