@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import sys
+from collections import defaultdict
+
+def mapper():
+    """
+    Mapper 处理输入数据，输出：
+        Key: 邮政编码数量
+        Value: 1（表示有一个城市）
+    """
+    for line in sys.stdin:
+        line = line.strip()
+        parts = line.split('\t')  # 按制表符分割输入数据
+        
+        # 数据不完整的行跳过
+        if len(parts) < 5:
+            continue
+        
+        # 假设邮政编码在第5个字段 (索引4)
+        zip_codes = parts[4]
+        
+        # 计算邮政编码的数量
+        if zip_codes == "":  # 没有邮政编码
+            num_zip_codes = 0
+        else:
+            num_zip_codes = len(zip_codes.split(','))  # 按逗号分割，计算数量
+        
+        # 输出 key-value 对
+        print(f"{num_zip_codes}\t1")
+
+def reducer():
+    """
+    Reducer 处理 Mapper 输出，累加相同 key 的值：
+        Key: 邮政编码数量
+        Value: 对应城市数量
+    """
+    city_count = defaultdict(int)  # 存储 key -> value 的聚合结果
+    
+    for line in sys.stdin:
+        line = line.strip()
+        try:
+            key, value = line.split('\t')
+            key = int(key)
+            value = int(value)
+            city_count[key] += value  # 聚合相同 key 的值
+        except ValueError:
+            continue  # 跳过格式错误的行
+    
+    # 输出聚合结果
+    for key, value in sorted(city_count.items()):
+        print(f"{key}\t{value}")
+
+if __name__ == "__main__":
+    """
+    主函数：根据 Hadoop 参数执行 mapper 或 reducer
+    """
+    if 'mapper' in sys.argv:
+        mapper()
+    elif 'reducer' in sys.argv:
+        reducer()
+    else:
+        print("Specify 'mapper' or 'reducer' as argument")
