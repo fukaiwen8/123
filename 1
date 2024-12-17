@@ -1,67 +1,113 @@
 import sys
 
-# Mapper
+# ==================
+# Mapper 部分
+# ==================
 def mapper():
     """
-    读取每行边数据，将节点及其出现位置（左 or 右）分别输出。
-    输出格式: node \t position(Left/Right) \t count(1)
+    读取输入数据 (edges 文件)，对于每个节点 (左节点和右节点) 输出键值对：
+    node -> (left_count, right_count)
     """
     for line in sys.stdin:
-        line = line.strip()
-        nodes = line.split()
+        line = line.strip()  # 移除空格、换行符
+        nodes = line.split()  # 拆分出两个节点
         if len(nodes) == 2:
             left_node, right_node = nodes
-            # 左节点输出
-            print(f"{left_node}\tLeft\t1")
-            # 右节点输出
-            print(f"{right_node}\tRight\t1")
+            # 输出左节点 (左计数为1，右计数为0)
+            print(f"{left_node}\t1\t0")
+            # 输出右节点 (左计数为0，右计数为1)
+            print(f"{right_node}\t0\t1")
 
-# Combiner 和 Reducer
-def reducer():
+# ==================
+# Combiner 部分
+# ==================
+def combiner():
     """
-    对每个节点在左边和右边的出现次数进行汇总。
-    过滤掉总出现次数小于3的节点。
-    输出格式: node \t [left_count, right_count]
+    在 Mapper 输出端进行本地聚合。
+    对于同一节点，将左边和右边的计数累加起来，输出聚合结果。
     """
     current_node = None
-    left_count, right_count = 0, 0  # 初始化左边和右边的计数
+    left_count = 0
+    right_count = 0
 
     for line in sys.stdin:
         line = line.strip()
-        node, position, count = line.split("\t")
-        count = int(count)
+        node, left, right = line.split("\t")
+        try:
+            left = int(left)
+            right = int(right)
+        except ValueError:
+            continue  # 跳过错误格式的行
 
-        # 汇总当前节点的计数
-        if current_node == node:
-            if position == "Left":
-                left_count += count
-            elif position == "Right":
-                right_count += count
+        if current_node == node:  # 同一个节点累加计数
+            left_count += left
+            right_count += right
         else:
-            # 输出上一个节点的统计结果
-            if current_node and (left_count + right_count) >= 3:
-                print(f"{current_node}\t[{left_count}, {right_count}]")
-            # 更新当前节点
+            if current_node is not None:
+                # 输出上一个节点的聚合结果
+                print(f"{current_node}\t{left_count}\t{right_count}")
+            # 更新当前节点及计数
             current_node = node
-            left_count, right_count = 0, 0
-            if position == "Left":
-                left_count = count
-            elif position == "Right":
-                right_count = count
+            left_count = left
+            right_count = right
+
+    # 输出最后一个节点的聚合结果
+    if current_node is not None:
+        print(f"{current_node}\t{left_count}\t{right_count}")
+
+# ==================
+# Reducer 部分
+# ==================
+def reducer():
+    """
+    Reducer 对 Combiner 或 Mapper 的输出进一步聚合，
+    并过滤出总次数 >= 3 的节点。
+    """
+    current_node = None
+    left_count = 0
+    right_count = 0
+
+    for line in sys.stdin:
+        line = line.strip()
+        node, left, right = line.split("\t")
+        try:
+            left = int(left)
+            right = int(right)
+        except ValueError:
+            continue  # 跳过错误格式的行
+
+        if current_node == node:  # 同一个节点累加计数
+            left_count += left
+            right_count += right
+        else:
+            if current_node is not None:
+                total_count = left_count + right_count
+                if total_count >= 3:
+                    # 过滤总次数 >= 3 的节点，并输出格式化结果
+                    print(f"{current_node}\t[{left_count}, {right_count}]")
+            # 更新当前节点及计数
+            current_node = node
+            left_count = left
+            right_count = right
 
     # 输出最后一个节点的结果
-    if current_node and (left_count + right_count) >= 3:
-        print(f"{current_node}\t[{left_count}, {right_count}]")
+    if current_node is not None:
+        total_count = left_count + right_count
+        if total_count >= 3:
+            print(f"{current_node}\t[{left_count}, {right_count}]")
 
-# 主函数
+# ==================
+# 主函数：根据参数调用 Mapper、Combiner 或 Reducer
+# ==================
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == "mapper":
             mapper()
+        elif sys.argv[1] == "combiner":
+            combiner()
         elif sys.argv[1] == "reducer":
             reducer()
         else:
-            print("Usage: python mr_final.py [mapper|reducer]")
+            print("Usage: python mr_final.py [mapper|combiner|reducer]")
     else:
-        print("Usage: python mr_final.py [mapper|reducer]")
-
+        print("Usage: python mr_final.py [mapper|combiner|reducer]")
