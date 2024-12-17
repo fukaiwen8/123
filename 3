@@ -1,99 +1,78 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 
-object df_final {
+object DFFinal {
 
-  def main(args: Array[String]): Unit = {
-    val spark = getSparkSession()  // 获取 SparkSession
-    val df = getDF(spark)          // 读取数据集
-    val result = doFinal(df)       // 执行核心逻辑
-    saveit(result, "everything_df")// 保存结果到指定路径
-    spark.stop()                   // 停止 SparkSession
-  }
+    def main(args: Array[String]) = {  // autograder will call this function
+        //remember, DataFrames only
+        val spark = getSparkSession()
+        import spark.implicits._
+        val mydf = getDF(spark)
+        val answer = doFinal(mydf)
+        saveit(answer, "df_final")
 
-  /** 
-   * 获取 SparkSession
-   */
-  def getSparkSession(): SparkSession = {
-    SparkSession.builder()
-      .appName("Node Appearance Counter")
-      .getOrCreate()
-  }
+    }
 
-  /**
-   * 读取 HDFS 数据集并返回 DataFrame
-   */
-  def getDF(spark: SparkSession): DataFrame = {
-    import spark.implicits._
-
-    // 读取 edges 数据集
-    spark.read
-      .text("hdfs:///datasets/facebook/0.edges") // 读取文本文件
-      .filter($"value".isNotNull) // 过滤空行
-      .withColumn("Left", split($"value", " ").getItem(0))  // 拆分第一列 (Left node)
-      .withColumn("Right", split($"value", " ").getItem(1)) // 拆分第二列 (Right node)
-      .select("Left", "Right") // 只保留 Left 和 Right 列
-  }
-
-  /**
-   * 核心逻辑：统计节点的左边和右边出现次数，并过滤总次数 >= 3 的节点
-   */
-  def doFinal(df: DataFrame): DataFrame = {
-    import df.sparkSession.implicits._
-
-    // Step 1: 统计左节点和右节点的出现次数
+    def doFinal(input: DataFrame): DataFrame = {
     val leftCounts = df.groupBy("Left").count()
-      .withColumnRenamed("Left", "Node") // 重命名列为 Node
-      .withColumnRenamed("count", "LeftCount") // 计数重命名为 LeftCount
+      .withColumnRenamed("Left", "Node")
+      .withColumnRenamed("count", "LeftCount")
 
     val rightCounts = df.groupBy("Right").count()
-      .withColumnRenamed("Right", "Node") // 重命名列为 Node
-      .withColumnRenamed("count", "RightCount") // 计数重命名为 RightCount
+      .withColumnRenamed("Right", "Node")
+      .withColumnRenamed("count", "RightCount")
 
-    // Step 2: 合并左节点和右节点的统计结果
     val combinedCounts = leftCounts
-      .join(rightCounts, Seq("Node"), "outer") // 外连接合并，保留所有节点
-      .na.fill(0, Seq("LeftCount", "RightCount")) // 填充缺失值为0
-      .withColumn("TotalCount", $"LeftCount" + $"RightCount") // 计算总次数
+      .join(rightCounts, Seq("Node"), "outer")
+      .na.fill(0, Seq("LeftCount", "RightCount"))
+      .withColumn("TotalCount", $"LeftCount" + $"RightCount")
 
-    // Step 3: 过滤总次数 >= 3 的节点
     val filtered = combinedCounts.filter($"TotalCount" >= 3)
 
-    // Step 4: 格式化输出为 node 和 [left_count, right_count]
     filtered.select($"Node", concat(lit("["), $"LeftCount", lit(", "), $"RightCount", lit("]")).alias("Counts"))
-  }
+    }
 
-  /**
-   * 测试数据集 (getTestDF)
-   */
-  def getTestDF(spark: SparkSession): DataFrame = {
-    import spark.implicits._
-    Seq(
-      ("236 186"),
-      ("122 285"),
-      ("236 122"),
-      ("186 285"),
-      ("236 186")
-    ).toDF("value")
-  }
+    def getSparkSession(): SparkSession = {
+        val spark = SparkSession.builder().getOrCreate()
+        spark
+    }
 
-  /**
-   * 预期输出结果 (expectedOutput)
-   */
-  def expectedOutput(spark: SparkSession): DataFrame = {
-    import spark.implicits._
-    Seq(
-      ("236", "[3, 2]"),
-      ("186", "[1, 2]"),
-      ("122", "[1, 1]")
-    ).toDF("Node", "Counts")
-  }
+    def getDF(spark: SparkSession): DataFrame = {
+        import spark.implicits._
+    spark.read
+      .text("hdfs:///datasets/facebook")
+      .filter($"value".isNotNull)
+      .withColumn("Left", split($"value", " ").getItem(0))
+      .withColumn("Right", split($"value", " ").getItem(1))
+      .select("Left", "Right")
+    }
 
-  /**
-   * 保存结果到 HDFS
-   */
-  def saveit(result: DataFrame, path: String): Unit = {
-    result.write.mode("overwrite").csv(path)
-  }
+    def getTestDF(spark: SparkSession): DataFrame = {
+        import spark.implicits._
+        Seq(
+       ("236 186"),
+       ("122 285"),
+       ("236 122"),
+       ("186 285"),
+       ("236 186")
+        ).toDF("value")
+    }
+
+    def expectedOutput(spark: SparkSession): DataFrame = {
+        import spark.implicits._
+        Seq(
+        ("236", "[3, 2]"),
+        ("186", "[1, 2]"),
+        ("122", "[1, 1]")
+       ).toDF("Node", "Counts")
+    }
+
+    def saveit(counts: DataFrame, name: String) = {
+      counts.write.format("csv").mode("overwrite").save(name)
+
+    }
+
 }
 
+
+xiu fu
