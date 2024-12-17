@@ -1,38 +1,22 @@
 from mrjob.job import MRJob
-from mrjob.step import MRStep
 
 class NodeAppearanceCount(MRJob):
 
-    def steps(self):
-        """ 定义 MapReduce 步骤，包括 Combiner 和 Reducer """
-        return [
-            MRStep(
-                mapper=self.mapper_count_nodes,
-                combiner=self.combiner_sum_counts,
-                reducer=self.reducer_sum_counts
-            ),
-            MRStep(
-                reducer=self.reducer_filter_min_3
-            )
-        ]
-
-    def mapper_count_nodes(self, _, line):
+    def mapper(self, _, line):
         """
         Mapper: 读取边 (node1 node2)，输出每个节点及其计数。
         左节点 -> (1, 0)，表示左边计数+1，右边计数为0。
         右节点 -> (0, 1)，表示左边计数为0，右边计数+1。
         """
-        nodes = line.strip().split()  # 按空格拆分节点
-        if len(nodes) == 2:
+        nodes = line.strip().split()  # 按空格拆分行
+        if len(nodes) == 2:  # 确保行合法
             left_node, right_node = nodes
-            # 左节点出现
-            yield left_node, (1, 0)
-            # 右节点出现
-            yield right_node, (0, 1)
+            yield left_node, (1, 0)  # 左节点出现一次
+            yield right_node, (0, 1)  # 右节点出现一次
 
-    def combiner_sum_counts(self, node, counts):
+    def combiner(self, node, counts):
         """
-        Combiner: 对 Mapper 输出的结果在本地进行部分聚合，减少数据传输。
+        Combiner: 对 Mapper 输出进行本地聚合，减少网络传输量。
         将 (1, 0) 和 (0, 1) 累加为 (left_sum, right_sum)。
         """
         left_sum, right_sum = 0, 0
@@ -41,33 +25,20 @@ class NodeAppearanceCount(MRJob):
             right_sum += right
         yield node, (left_sum, right_sum)
 
-    def reducer_sum_counts(self, node, counts):
+    def reducer(self, node, counts):
         """
-        Reducer 1: 对相同节点的计数进行全局聚合。
-        输入：node -> [(left_sum1, right_sum1), (left_sum2, right_sum2), ...]
-        输出：node -> (left_total, right_total)
+        Reducer: 对 Combiner 输出进行全局聚合，并过滤掉总次数小于3的节点。
+        输出满足条件的节点及其左边和右边的计数。
         """
         left_total, right_total = 0, 0
         for left, right in counts:
             left_total += left
             right_total += right
-        yield node, (left_total, right_total)
 
-    def reducer_filter_min_3(self, node, counts):
-        """
-        Reducer 2: 过滤总次数 >= 3 的节点，并输出节点的左边和右边的出现次数。
-        输入：node -> (left_total, right_total)
-        输出：node -> [left_total, right_total]
-        """
-        left_total, right_total = counts
-        total_count = left_total + right_total
-        if total_count >= 3:  # 总次数 >= 3 才输出
-            yield node, [left_total, right_total]
+        total_count = left_total + right_total  # 计算总次数
+        if total_count >= 3:  # 过滤条件：总次数 >= 3
+            yield node, (left_total, right_total)
 
 
 if __name__ == "__main__":
     NodeAppearanceCount.run()
-
-
-
-zhi yao mrjob bu yao mrstep
