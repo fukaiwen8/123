@@ -1,44 +1,26 @@
 import org.apache.spark.{SparkConf, SparkContext}
 
-object rdd_final {
+object RDDFinal {  
 
-  def main(args: Array[String]): Unit = {
-    // 初始化 SparkContext
-    val sc = getSC()
-    
-    // 读取 RDD 数据集
-    val rdd = getRDD(sc)
-    
-    // 执行主逻辑处理
-    val result = doFinal(rdd)
-    
-    // 保存结果到指定路径
-    saveit(result, "everything_rdd")
-    
-    // 停止 SparkContext
-    sc.stop()
-  }
+    def main(args: Array[String]) = {  // autograder will call this function
+        //remember, RDDs only
+        val sc = getSC()  // one function to get the sc variable
+        val myrdd = getRDD(sc) // on function to get the rdd
+        val answer = doFinal(myrdd) // additional functions to do the computation
+        saveit(answer, "rdd_final")  // save the rdd to your home directory in HDFS
+    }
 
-  /** 
-   * 获取 SparkContext  
-   */
-  def getSC(): SparkContext = {
+    def getSC(): SparkContext = {
     val conf = new SparkConf().setAppName("Node Appearance Counter")
     new SparkContext(conf)
-  }
+    }
 
-  /**
-   * 读取 Facebook 数据集，返回 RDD
-   */
-  def getRDD(sc: SparkContext) = {
-    sc.textFile("hdfs:///datasets/facebook/0.edges")
-  }
 
-  /**
-   * 核心处理逻辑：统计每个节点的左边和右边出现次数
-   */
-  def doFinal(input: org.apache.spark.rdd.RDD[String]): org.apache.spark.rdd.RDD[String] = {
-    // Step 1: 将节点转换为键值对 (node, "Left" 或 "Right", 1)
+    def getRDD(sc:SparkContext): RDD[String] = { // get the big data rdd
+sc.textFile("hdfs:///datasets/facebook")
+    }
+
+    def doFinal(input: RDD[String]): RDD[(String, (Int, Int))] = {
     val nodeCounts = input.flatMap(line => {
       val nodes = line.split(" ")
       if (nodes.length == 2) {
@@ -48,62 +30,54 @@ object rdd_final {
       } else Seq()
     })
 
-    // Step 2: 对每个节点在 Left 和 Right 的次数进行聚合
     val aggregatedCounts = nodeCounts
-      .map { case (node, (position, count)) => ((node, position), count) } // 转换成 ((node, position), 1)
-      .reduceByKey(_ + _) // 聚合相同 (node, position) 的计数
-      .map { case ((node, position), count) => (node, (position, count)) } // 转回 (node, (position, count))
+      .map { case (node, (position, count)) => ((node, position), count) }
+      .reduceByKey(_ + _)
+      .map { case ((node, position), count) => (node, (position, count)) }
 
-    // Step 3: 合并 Left 和 Right 的次数
     val finalCounts = aggregatedCounts
-      .groupByKey() // 按节点分组，得到 (node, Iterable((Left/Right, count)))
+      .groupByKey()
       .mapValues(iter => {
         var leftCount = 0
         var rightCount = 0
-        // 遍历每个节点的计数，分开统计 Left 和 Right
         iter.foreach {
           case ("Left", count)  => leftCount += count
           case ("Right", count) => rightCount += count
         }
         (leftCount, rightCount)
       })
-      // 过滤掉总次数小于3的节点
       .filter { case (_, (left, right)) => (left + right) >= 3 }
-      // 格式化输出结果
       .map { case (node, (left, right)) => s"$node\t[$left, $right]" }
 
     finalCounts
-  }
 
-  /**
-   * 生成测试 RDD (用于测试)
-   */
-  def getTestRDD(sc: SparkContext): org.apache.spark.rdd.RDD[String] = {
-    sc.parallelize(Seq(
+    }
+   
+    def getTestRDD(sc: SparkContext): RDD[String] = {
+ sc.parallelize(Seq(
       "236 186",
       "122 285",
       "236 122",
       "186 285",
       "236 186"
     ))
-  }
 
-  /**
-   * 预期输出结果 (用于测试)
-   */
-  def expectedOutput(sc: SparkContext): org.apache.spark.rdd.RDD[String] = {
-    sc.parallelize(Seq(
+    }
+
+    def expectedOutput(sc: SparkContext): RDD[(String, (Int, Int))] = {
+ sc.parallelize(Seq(
       "236\t[3, 2]",
       "186\t[1, 2]",
       "122\t[1, 1]"
     ))
-  }
 
-  /**
-   * 保存 RDD 结果到指定路径
-   */
-  def saveit(result: org.apache.spark.rdd.RDD[String], path: String): Unit = {
-    result.saveAsTextFile(path)
-  }
+    }
+
+    def saveit(myrdd: RDD[(String, (Int, Int))], name: String) = {
+        myrdd.saveAsTextFile(name)
+    }
+
 }
 
+
+xiu fu zhe ge dai ma
